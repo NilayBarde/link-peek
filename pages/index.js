@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { unparse } from "papaparse";
 import StatusBar from "../components/src/StatusBar";
-import { useSession } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import styles from "../styles/LinkPeek.module.css";
 
 const MAX_FREE_PREVIEWS = 10;
@@ -132,6 +132,11 @@ export default function LinkPeek() {
             const response = await fetch("/api/checkout-session", {
                 method: "POST",
             });
+            if (response.status === 401) {
+                // Not logged in, redirect to sign in
+                signIn();
+                return;
+            }
             const data = await response.json();
             if (data.url) {
                 window.location.href = data.url;
