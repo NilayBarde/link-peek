@@ -42,6 +42,13 @@
     outline: none;
 }
 
+.descriptionText {
+    font-size: 1.125rem;
+    color: #4b5563; /* cool gray */
+    margin-bottom: 1.5rem;
+    user-select: none;
+}
+
 .buttonGroup {
     display: flex;
     gap: 1rem;

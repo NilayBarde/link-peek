@@ -116,6 +116,10 @@ export default function LinkPeek() {
         <div className={styles.container}>
             <div className={styles.pageWrapper}>
                 <h1 className={styles.title}>Link Peek</h1>
+                <p className={styles.descriptionText}>
+                    Quickly preview website titles, descriptions, and images
+                    from multiple URLs at once.
+                </p>
 
                 <textarea
                     className={styles.textarea}
