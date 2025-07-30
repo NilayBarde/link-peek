@@ -70,7 +70,7 @@ export default function LinkPeek() {
             const availableSlots = MAX_FREE_PREVIEWS - previewCount;
 
             if (availableSlots <= 0) {
-                alert("You've reached your daily preview limit.");
+                alert("You&#39;ve reached your daily preview limit.");
                 return;
             }
 
@@ -201,8 +201,8 @@ export default function LinkPeek() {
                 {isLimitReached && (
                     <div className={styles.limitNotice}>
                         <p>
-                            <strong>Limit Reached:</strong> You've used all your
-                            free previews for today.
+                            <strong>Limit Reached:</strong> You&#39;ve used all
+                            your free previews for today.
                         </p>
                         <button
                             onClick={handleUpgrade}
