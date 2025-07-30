@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { unparse } from "papaparse";
+import StatusBar from "../components/src/StatusBar";
 import styles from "../styles/LinkPeek.module.css";
 
 const MAX_FREE_PREVIEWS = 10;
@@ -115,6 +116,7 @@ export default function LinkPeek() {
     return (
         <div className={styles.container}>
             <div className={styles.pageWrapper}>
+                <StatusBar />
                 <h1 className={styles.title}>Link Peek</h1>
                 <p className={styles.descriptionText}>
                     Quickly preview website titles, descriptions, and images
