@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { unparse } from "papaparse";
 import StatusBar from "../components/src/StatusBar";
+import { useSession } from "next-auth/react";
 import styles from "../styles/LinkPeek.module.css";
 
 const MAX_FREE_PREVIEWS = 10;
@@ -11,6 +12,7 @@ export default function LinkPeek() {
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
     const [previewCount, setPreviewCount] = useState(0);
+    const { data: session } = useSession();
 
     // Reset daily usage limit
     useEffect(() => {
@@ -28,50 +30,79 @@ export default function LinkPeek() {
         }
     }, []);
 
-    const isLimitReached = previewCount >= MAX_FREE_PREVIEWS;
+    // Determine if the user is limited or not:
+    // If pro, never limit; else limit by previewCount
+    const isLimitReached =
+        !session?.user?.isPro && previewCount >= MAX_FREE_PREVIEWS;
 
     const handleSubmit = async () => {
-        const urlList = urls
-            .split(/\n|,/)
-            .map((url) => url.trim())
-            .filter(Boolean);
+        if (session?.user?.isPro) {
+            // Pro user: no limit on previews
+            // Just send all URLs entered
+            const urlList = urls
+                .split(/\n|,/)
+                .map((url) => url.trim())
+                .filter(Boolean);
 
-        if (!urlList.length) return;
+            if (!urlList.length) return;
 
-        // Check how many URLs they are trying to preview
-        const availableSlots = MAX_FREE_PREVIEWS - previewCount;
+            setLoading(true);
+            try {
+                const res = await axios.post("/api/fetch-metadata", {
+                    urls: urlList,
+                });
 
-        if (availableSlots <= 0) {
-            alert("You've reached your daily preview limit.");
-            return;
-        }
+                setResults((prev) => [...prev, ...res.data]);
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
+        } else {
+            // Free user: enforce daily limit logic
+            const urlList = urls
+                .split(/\n|,/)
+                .map((url) => url.trim())
+                .filter(Boolean);
 
-        // Only send allowed number of URLs
-        const safeUrlList = urlList.slice(0, availableSlots);
+            if (!urlList.length) return;
 
-        setLoading(true);
-        try {
-            const res = await axios.post("/api/fetch-metadata", {
-                urls: safeUrlList,
-            });
+            const availableSlots = MAX_FREE_PREVIEWS - previewCount;
 
-            if (urlList.length > availableSlots) {
-                alert(
-                    `You can only preview ${availableSlots} more URL${
-                        availableSlots > 1 ? "s" : ""
-                    } today.`
-                );
+            if (availableSlots <= 0) {
+                alert("You've reached your daily preview limit.");
+                return;
             }
 
-            setResults((prev) => [...prev, ...res.data]);
+            const safeUrlList = urlList.slice(0, availableSlots);
 
-            const newCount = previewCount + safeUrlList.length;
-            localStorage.setItem("linkPeekPreviewCount", newCount.toString());
-            setPreviewCount(newCount);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
+            setLoading(true);
+            try {
+                const res = await axios.post("/api/fetch-metadata", {
+                    urls: safeUrlList,
+                });
+
+                if (urlList.length > availableSlots) {
+                    alert(
+                        `You can only preview ${availableSlots} more URL${
+                            availableSlots > 1 ? "s" : ""
+                        } today.`
+                    );
+                }
+
+                setResults((prev) => [...prev, ...res.data]);
+
+                const newCount = previewCount + safeUrlList.length;
+                localStorage.setItem(
+                    "linkPeekPreviewCount",
+                    newCount.toString()
+                );
+                setPreviewCount(newCount);
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
         }
     };
 
@@ -152,18 +183,20 @@ export default function LinkPeek() {
                     >
                         Export to CSV
                     </button>
-                    <button
-                        className={styles.buttonPurple}
-                        onClick={handleUpgrade}
-                    >
-                        Upgrade to Pro
-                    </button>
+                    {!session?.user?.isPro && (
+                        <button
+                            className={styles.buttonPurple}
+                            onClick={handleUpgrade}
+                        >
+                            Upgrade to Pro
+                        </button>
+                    )}
                 </div>
 
                 {isLimitReached && (
                     <div className={styles.limitNotice}>
                         <p>
-                            <strong>Limit Reached:</strong> You’ve used all your
+                            <strong>Limit Reached:</strong> You've used all your
                             free previews for today.
                         </p>
                         <button

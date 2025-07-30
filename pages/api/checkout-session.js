@@ -1,31 +1,50 @@
+import prisma from "../../lib/prisma";
+import { getSession } from "next-auth/react";
 import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
     if (req.method !== "POST") {
-        return res.status(405).json({ error: "Method not allowed" });
+        return res.status(405).end();
     }
 
-    try {
-        const session = await stripe.checkout.sessions.create({
-            mode: "payment",
-            payment_method_types: ["card"],
-            line_items: [
-                {
-                    price: process.env.STRIPE_PRICE_ID,
-                    quantity: 1,
-                },
-            ],
-            success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}`,
-        });
+    const session = await getSession({ req });
+    if (!session?.user?.email) {
+        return res.status(401).json({ error: "Not authenticated" });
+    }
 
-        res.status(200).json({ url: session.url });
-    } catch (error) {
-        console.error("Stripe checkout error:", error);
-        res.status(500).json({
-            error: "Failed to create Stripe checkout session",
+    // Find user in DB
+    const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+    });
+
+    // Create or reuse stripe customer
+    let customerId = user?.stripeCustomerId;
+
+    if (!customerId) {
+        const customer = await stripe.customers.create({
+            email: session.user.email,
+        });
+        customerId = customer.id;
+
+        await prisma.user.upsert({
+            where: { email: session.user.email },
+            update: { stripeCustomerId: customerId },
+            create: {
+                email: session.user.email,
+                stripeCustomerId: customerId,
+            },
         });
     }
+
+    const checkoutSession = await stripe.checkout.sessions.create({
+        mode: "payment",
+        payment_method_types: ["card"],
+        customer: customerId,
+        line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
+        success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success`,
+    });
+
+    res.status(200).json({ url: checkoutSession.url });
 }
