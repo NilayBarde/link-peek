@@ -95,6 +95,23 @@ export default function LinkPeek() {
         document.body.removeChild(link);
     };
 
+    const handleUpgrade = async () => {
+        try {
+            const response = await fetch("/api/checkout-session", {
+                method: "POST",
+            });
+            const data = await response.json();
+            if (data.url) {
+                window.location.href = data.url;
+            } else {
+                alert("Failed to start upgrade process.");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Error starting upgrade process.");
+        }
+    };
+
     return (
         <div className={styles.container}>
             <div className={styles.pageWrapper}>
@@ -129,13 +146,27 @@ export default function LinkPeek() {
                     >
                         Export to CSV
                     </button>
+                    <button
+                        className={styles.buttonPurple}
+                        onClick={handleUpgrade}
+                    >
+                        Upgrade to Pro
+                    </button>
                 </div>
 
                 {isLimitReached && (
-                    <p className={styles.limitNotice}>
-                        You’ve reached your daily free preview limit.{" "}
-                        <a href="/upgrade">Upgrade for unlimited access</a>.
-                    </p>
+                    <div className={styles.limitNotice}>
+                        <p>
+                            <strong>Limit Reached:</strong> You’ve used all your
+                            free previews for today.
+                        </p>
+                        <button
+                            onClick={handleUpgrade}
+                            className={`${styles.button} ${styles.buttonPrimary}`}
+                        >
+                            Upgrade for Unlimited Access
+                        </button>
+                    </div>
                 )}
 
                 <div className={styles.cardGrid}>
