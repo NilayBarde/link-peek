@@ -1,5 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
+import { unparse } from "papaparse";
 import styles from "../styles/LinkPeek.module.css";
 
 export default function LinkPeek() {
@@ -28,6 +29,27 @@ export default function LinkPeek() {
         }
     };
 
+    const handleExportCSV = () => {
+        if (!results.length) return;
+
+        const csv = unparse(
+            results.map(({ url, title, description, image }) => ({
+                URL: url,
+                Title: title,
+                Description: description,
+                Image: image,
+            }))
+        );
+
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", "link-previews.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className={styles.container}>
             <div className={styles.pageWrapper}>
@@ -48,6 +70,12 @@ export default function LinkPeek() {
                         onClick={handleSubmit}
                     >
                         {loading ? "Loading..." : "Generate Preview"}
+                    </button>
+                    <button
+                        className={styles.buttonPurple}
+                        onClick={handleExportCSV}
+                    >
+                        Export to CSV
                     </button>
                 </div>
 

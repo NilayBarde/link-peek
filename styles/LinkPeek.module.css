@@ -85,6 +85,21 @@
     background-color: #eef2ff;
 }
 
+.buttonPurple {
+    background-color: #6b21a8;
+    color: white;
+    border: none;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.buttonPurple:hover {
+    background-color: #581c87;
+}
+
 /* ---------- Result Cards ---------- */
 
 .cardGrid {
