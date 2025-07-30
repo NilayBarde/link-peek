@@ -100,6 +100,17 @@
     background-color: #581c87;
 }
 
+.limitNotice {
+    color: #7c3aed;
+    background-color: #f5f3ff;
+    padding: 0.75rem 1rem;
+    border: 1px solid #ddd6fe;
+    border-radius: 6px;
+    margin-top: 1rem;
+    font-size: 0.95rem;
+    text-align: center;
+}
+
 /* ---------- Result Cards ---------- */
 
 .cardGrid {

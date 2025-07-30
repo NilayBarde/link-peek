@@ -1,12 +1,33 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import { unparse } from "papaparse";
 import styles from "../styles/LinkPeek.module.css";
+
+const MAX_FREE_PREVIEWS = 10;
 
 export default function LinkPeek() {
     const [urls, setUrls] = useState("");
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [previewCount, setPreviewCount] = useState(0);
+
+    // Reset daily usage limit
+    useEffect(() => {
+        const lastReset = localStorage.getItem("linkPeekReset");
+        const now = Date.now();
+
+        if (!lastReset || now - Number(lastReset) > 86400000) {
+            localStorage.setItem("linkPeekPreviewCount", "0");
+            localStorage.setItem("linkPeekReset", now.toString());
+            setPreviewCount(0);
+        } else {
+            const count =
+                Number(localStorage.getItem("linkPeekPreviewCount")) || 0;
+            setPreviewCount(count);
+        }
+    }, []);
+
+    const isLimitReached = previewCount >= MAX_FREE_PREVIEWS;
 
     const handleSubmit = async () => {
         const urlList = urls
@@ -16,12 +37,36 @@ export default function LinkPeek() {
 
         if (!urlList.length) return;
 
+        // Check how many URLs they are trying to preview
+        const availableSlots = MAX_FREE_PREVIEWS - previewCount;
+
+        if (availableSlots <= 0) {
+            alert("You've reached your daily preview limit.");
+            return;
+        }
+
+        // Only send allowed number of URLs
+        const safeUrlList = urlList.slice(0, availableSlots);
+
         setLoading(true);
         try {
             const res = await axios.post("/api/fetch-metadata", {
-                urls: urlList,
+                urls: safeUrlList,
             });
-            setResults(res.data);
+
+            if (urlList.length > availableSlots) {
+                alert(
+                    `You can only preview ${availableSlots} more URL${
+                        availableSlots > 1 ? "s" : ""
+                    } today.`
+                );
+            }
+
+            setResults((prev) => [...prev, ...res.data]);
+
+            const newCount = previewCount + safeUrlList.length;
+            localStorage.setItem("linkPeekPreviewCount", newCount.toString());
+            setPreviewCount(newCount);
         } catch (err) {
             console.error(err);
         } finally {
@@ -61,23 +106,37 @@ export default function LinkPeek() {
                     rows={6}
                     value={urls}
                     onChange={(e) => setUrls(e.target.value)}
+                    disabled={isLimitReached}
                 />
 
                 <div className={styles.buttonGroup}>
                     <button
                         className={`${styles.button} ${styles.buttonPrimary}`}
-                        disabled={loading}
+                        disabled={loading || isLimitReached}
                         onClick={handleSubmit}
                     >
-                        {loading ? "Loading..." : "Generate Preview"}
+                        {isLimitReached
+                            ? "Daily Limit Reached"
+                            : loading
+                            ? "Loading..."
+                            : "Generate Preview"}
                     </button>
+
                     <button
                         className={styles.buttonPurple}
                         onClick={handleExportCSV}
+                        disabled={!results.length}
                     >
                         Export to CSV
                     </button>
                 </div>
+
+                {isLimitReached && (
+                    <p className={styles.limitNotice}>
+                        You’ve reached your daily free preview limit.{" "}
+                        <a href="/upgrade">Upgrade for unlimited access</a>.
+                    </p>
+                )}
 
                 <div className={styles.cardGrid}>
                     {results.map((meta, idx) => (
