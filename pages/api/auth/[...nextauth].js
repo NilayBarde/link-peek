@@ -9,6 +9,7 @@ export default NextAuth({
             clientSecret: process.env.GITHUB_SECRET,
         }),
     ],
+    secret: process.env.NEXTAUTH_SECRET,
     callbacks: {
         async session({ session }) {
             if (session?.user?.email) {
