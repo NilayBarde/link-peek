@@ -10,6 +10,7 @@ export default NextAuth({
         }),
     ],
     secret: process.env.NEXTAUTH_SECRET,
+    debug: true,
     callbacks: {
         async session({ session }) {
             if (session?.user?.email) {
