@@ -7,6 +7,38 @@ import styles from "../styles/LinkPeek.module.css";
 
 const MAX_FREE_PREVIEWS = 10;
 
+// Function to normalize URLs
+const normalizeUrl = (url) => {
+    // Remove whitespace
+    url = url.trim();
+
+    // Skip if empty
+    if (!url) return null;
+
+    // If it already has a protocol, return as is
+    if (/^https?:\/\//i.test(url)) {
+        return url;
+    }
+
+    // If it starts with www., add https://
+    if (/^www\./i.test(url)) {
+        return `https://${url}`;
+    }
+
+    // If it looks like a domain (contains a dot), add https://www.
+    if (/\.[a-z]{2,}$/i.test(url)) {
+        return `https://www.${url}`;
+    }
+
+    // If it's just a domain name without extension, add .com and https://www.
+    if (/^[a-zA-Z0-9-]+$/.test(url)) {
+        return `https://www.${url}.com`;
+    }
+
+    // Default: add https://www.
+    return `https://www.${url}`;
+};
+
 export default function LinkPeek() {
     const [urls, setUrls] = useState("");
     const [results, setResults] = useState([]);
@@ -36,12 +68,14 @@ export default function LinkPeek() {
         !session?.user?.isPro && previewCount >= MAX_FREE_PREVIEWS;
 
     const handleSubmit = async () => {
+        // Clear previous results for fresh search
+        setResults([]);
+
         if (session?.user?.isPro) {
             // Pro user: no limit on previews
-            // Just send all URLs entered
             const urlList = urls
                 .split(/\n|,/)
-                .map((url) => url.trim())
+                .map(normalizeUrl)
                 .filter(Boolean);
 
             if (!urlList.length) return;
@@ -52,9 +86,12 @@ export default function LinkPeek() {
                     urls: urlList,
                 });
 
-                setResults((prev) => [...prev, ...res.data]);
+                setResults(res.data); // Set fresh results instead of appending
             } catch (err) {
                 console.error(err);
+                alert(
+                    "Error fetching previews. Please check your URLs and try again."
+                );
             } finally {
                 setLoading(false);
             }
@@ -62,7 +99,7 @@ export default function LinkPeek() {
             // Free user: enforce daily limit logic
             const urlList = urls
                 .split(/\n|,/)
-                .map((url) => url.trim())
+                .map(normalizeUrl)
                 .filter(Boolean);
 
             if (!urlList.length) return;
@@ -70,7 +107,7 @@ export default function LinkPeek() {
             const availableSlots = MAX_FREE_PREVIEWS - previewCount;
 
             if (availableSlots <= 0) {
-                alert("You&#39;ve reached your daily preview limit.");
+                alert("You've reached your daily preview limit.");
                 return;
             }
 
@@ -90,7 +127,7 @@ export default function LinkPeek() {
                     );
                 }
 
-                setResults((prev) => [...prev, ...res.data]);
+                setResults(res.data); // Set fresh results instead of appending
 
                 const newCount = previewCount + safeUrlList.length;
                 localStorage.setItem(
@@ -100,10 +137,18 @@ export default function LinkPeek() {
                 setPreviewCount(newCount);
             } catch (err) {
                 console.error(err);
+                alert(
+                    "Error fetching previews. Please check your URLs and try again."
+                );
             } finally {
                 setLoading(false);
             }
         }
+    };
+
+    const handleClearResults = () => {
+        setResults([]);
+        setUrls("");
     };
 
     const handleExportCSV = () => {
@@ -156,12 +201,13 @@ export default function LinkPeek() {
                 <h1 className={styles.title}>Link Peek</h1>
                 <p className={styles.descriptionText}>
                     Quickly preview website titles, descriptions, and images
-                    from multiple URLs at once.
+                    from multiple URLs at once. Just enter domain names like
+                    "google.com" or full URLs.
                 </p>
 
                 <textarea
                     className={styles.textarea}
-                    placeholder="Paste URLs (newline or comma-separated)"
+                    placeholder="Enter URLs or domain names (e.g., google.com, https://example.com, www.site.com)"
                     rows={6}
                     value={urls}
                     onChange={(e) => setUrls(e.target.value)}
@@ -183,11 +229,20 @@ export default function LinkPeek() {
 
                     <button
                         className={styles.buttonPurple}
+                        onClick={handleClearResults}
+                        disabled={loading}
+                    >
+                        Clear Results
+                    </button>
+
+                    <button
+                        className={styles.buttonPurple}
                         onClick={handleExportCSV}
                         disabled={!results.length}
                     >
                         Export to CSV
                     </button>
+
                     {!session?.user?.isPro && (
                         <button
                             className={styles.buttonPurple}
@@ -198,11 +253,17 @@ export default function LinkPeek() {
                     )}
                 </div>
 
+                {!session?.user?.isPro && (
+                    <p className={styles.usageCounter}>
+                        Daily usage: {previewCount}/{MAX_FREE_PREVIEWS}
+                    </p>
+                )}
+
                 {isLimitReached && (
                     <div className={styles.limitNotice}>
                         <p>
-                            <strong>Limit Reached:</strong> You&#39;ve used all
-                            your free previews for today.
+                            <strong>Limit Reached:</strong> You've used all your
+                            free previews for today.
                         </p>
                         <button
                             onClick={handleUpgrade}
@@ -222,12 +283,21 @@ export default function LinkPeek() {
                                         src={meta.image}
                                         alt={meta.title || "preview"}
                                         className={styles.image}
+                                        onError={(e) => {
+                                            e.target.style.display = "none";
+                                            e.target.nextSibling.style.display =
+                                                "flex";
+                                        }}
                                     />
-                                ) : (
-                                    <div className={styles.placeholder}>
-                                        No Image
-                                    </div>
-                                )}
+                                ) : null}
+                                <div
+                                    className={styles.placeholder}
+                                    style={{
+                                        display: meta.image ? "none" : "flex",
+                                    }}
+                                >
+                                    No Image
+                                </div>
                             </div>
                             <div className={styles.meta}>
                                 <p className={styles.metaTitle}>
