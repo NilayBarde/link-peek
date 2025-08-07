@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
 import { unparse } from "papaparse";
 import StatusBar from "../components/src/StatusBar";
 import { useSession, signIn } from "next-auth/react";
@@ -44,6 +43,11 @@ export default function LinkPeek() {
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
     const [previewCount, setPreviewCount] = useState(0);
+    const [progress, setProgress] = useState({
+        completed: 0,
+        total: 0,
+        message: "",
+    });
     const { data: session } = useSession();
 
     // Reset daily usage limit
@@ -62,15 +66,85 @@ export default function LinkPeek() {
         }
     }, []);
 
+    // Function to handle batch processing with progress
+    const fetchWithProgress = async (urlList) => {
+        setResults([]);
+        setProgress({
+            completed: 0,
+            total: urlList.length,
+            message: "Starting...",
+        });
+
+        try {
+            const BATCH_SIZE = 5;
+            const totalBatches = Math.ceil(urlList.length / BATCH_SIZE);
+            let allResults = [];
+
+            for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+                setProgress({
+                    completed: batchIndex * BATCH_SIZE,
+                    total: urlList.length,
+                    message: `Processing batch ${
+                        batchIndex + 1
+                    } of ${totalBatches}...`,
+                });
+
+                const response = await fetch("/api/fetch-metadata", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        urls: urlList,
+                        batch: true,
+                        batchIndex,
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                allResults = [...allResults, ...data.results];
+
+                // Update results in real-time
+                setResults(allResults);
+                setProgress({
+                    completed: data.totalProcessed,
+                    total: data.totalUrls,
+                    message: `Completed ${data.totalProcessed}/${data.totalUrls} URLs`,
+                });
+
+                // Small delay between batches to show progress
+                if (!data.isComplete) {
+                    await new Promise((resolve) => setTimeout(resolve, 500));
+                }
+            }
+
+            const successful = allResults.filter((r) => r.success).length;
+            const failed = allResults.filter((r) => !r.success).length;
+
+            setProgress({
+                completed: urlList.length,
+                total: urlList.length,
+                message: `Completed! ${successful} successful, ${failed} failed`,
+            });
+        } catch (error) {
+            console.error("Fetch error:", error);
+            alert(
+                "Error fetching previews. Please check your URLs and try again."
+            );
+            setProgress({ completed: 0, total: 0, message: "Error occurred" });
+        }
+    };
+
     // Determine if the user is limited or not:
     // If pro, never limit; else limit by previewCount
     const isLimitReached =
         !session?.user?.isPro && previewCount >= MAX_FREE_PREVIEWS;
 
     const handleSubmit = async () => {
-        // Clear previous results for fresh search
-        setResults([]);
-
         if (session?.user?.isPro) {
             // Pro user: no limit on previews
             const urlList = urls
@@ -81,20 +155,8 @@ export default function LinkPeek() {
             if (!urlList.length) return;
 
             setLoading(true);
-            try {
-                const res = await axios.post("/api/fetch-metadata", {
-                    urls: urlList,
-                });
-
-                setResults(res.data); // Set fresh results instead of appending
-            } catch (err) {
-                console.error(err);
-                alert(
-                    "Error fetching previews. Please check your URLs and try again."
-                );
-            } finally {
-                setLoading(false);
-            }
+            await fetchWithProgress(urlList);
+            setLoading(false);
         } else {
             // Free user: enforce daily limit logic
             const urlList = urls
@@ -113,42 +175,28 @@ export default function LinkPeek() {
 
             const safeUrlList = urlList.slice(0, availableSlots);
 
-            setLoading(true);
-            try {
-                const res = await axios.post("/api/fetch-metadata", {
-                    urls: safeUrlList,
-                });
-
-                if (urlList.length > availableSlots) {
-                    alert(
-                        `You can only preview ${availableSlots} more URL${
-                            availableSlots > 1 ? "s" : ""
-                        } today.`
-                    );
-                }
-
-                setResults(res.data); // Set fresh results instead of appending
-
-                const newCount = previewCount + safeUrlList.length;
-                localStorage.setItem(
-                    "linkPeekPreviewCount",
-                    newCount.toString()
-                );
-                setPreviewCount(newCount);
-            } catch (err) {
-                console.error(err);
+            if (urlList.length > availableSlots) {
                 alert(
-                    "Error fetching previews. Please check your URLs and try again."
+                    `You can only preview ${availableSlots} more URL${
+                        availableSlots > 1 ? "s" : ""
+                    } today.`
                 );
-            } finally {
-                setLoading(false);
             }
+
+            setLoading(true);
+            await fetchWithProgress(safeUrlList);
+
+            const newCount = previewCount + safeUrlList.length;
+            localStorage.setItem("linkPeekPreviewCount", newCount.toString());
+            setPreviewCount(newCount);
+            setLoading(false);
         }
     };
 
     const handleClearResults = () => {
         setResults([]);
         setUrls("");
+        setProgress({ completed: 0, total: 0, message: "" });
     };
 
     const handleExportCSV = () => {
@@ -252,6 +300,29 @@ export default function LinkPeek() {
                         </button>
                     )}
                 </div>
+
+                {loading && (
+                    <div className={styles.progressContainer}>
+                        <div className={styles.progressBar}>
+                            <div
+                                className={styles.progressFill}
+                                style={{
+                                    width: `${
+                                        progress.total > 0
+                                            ? (progress.completed /
+                                                  progress.total) *
+                                              100
+                                            : 0
+                                    }%`,
+                                }}
+                            />
+                        </div>
+                        <p className={styles.progressText}>
+                            {progress.message} ({progress.completed}/
+                            {progress.total})
+                        </p>
+                    </div>
+                )}
 
                 {!session?.user?.isPro && (
                     <p className={styles.usageCounter}>
