@@ -29,3 +29,4 @@ yarn-error.log*
 
 # Other IDE/editor folders (optional)
 .idea/
+.vercel
