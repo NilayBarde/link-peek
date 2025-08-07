@@ -313,7 +313,7 @@ export default function LinkPeek() {
                                                   progress.total) *
                                               100
                                             : 0
-                                    }%`,
+                                    }`,
                                 }}
                             />
                         </div>
