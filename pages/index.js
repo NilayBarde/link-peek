@@ -250,7 +250,7 @@ export default function LinkPeek() {
                 <p className={styles.descriptionText}>
                     Quickly preview website titles, descriptions, and images
                     from multiple URLs at once. Just enter domain names like
-                    "google.com" or full URLs.
+                    google.com or full URLs.
                 </p>
 
                 <textarea
@@ -313,7 +313,7 @@ export default function LinkPeek() {
                                                   progress.total) *
                                               100
                                             : 0
-                                    }`,
+                                    }%`,
                                 }}
                             />
                         </div>
@@ -333,8 +333,8 @@ export default function LinkPeek() {
                 {isLimitReached && (
                     <div className={styles.limitNotice}>
                         <p>
-                            <strong>Limit Reached:</strong> You've used all your
-                            free previews for today.
+                            <strong>Limit Reached:</strong> You&apos;ve used all
+                            your free previews for today.
                         </p>
                         <button
                             onClick={handleUpgrade}
