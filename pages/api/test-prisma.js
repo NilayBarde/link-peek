@@ -1,11 +1,18 @@
-// pages/api/test-prisma.js
 import prisma from "../../lib/prisma";
 
 export default async function handler(req, res) {
     try {
-        const users = await prisma.user.findMany();
-        res.json({ users });
+        await prisma.$connect();
+        const userCount = await prisma.user.count();
+        res.status(200).json({ success: true, userCount });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error("DB connection error:", error);
+        res.status(500).json({
+            success: false,
+            message: error.message,
+            stack: error.stack,
+        });
+    } finally {
+        await prisma.$disconnect();
     }
 }
